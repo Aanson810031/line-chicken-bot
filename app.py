@@ -4,18 +4,14 @@ import os
 
 app = Flask(__name__)
 
-# 從 Render 的環境變數讀取 LINE Access Token
 CHANNEL_ACCESS_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
-# OpenRouter API 金鑰
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-# LINE 回覆用的 Header
 LINE_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"
 }
 
-# OpenRouter 請求用的 Header
 OPENROUTER_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {OPENROUTER_API_KEY}"
@@ -28,17 +24,18 @@ def webhook():
     user_text = event["message"]["text"]
     reply_token = event["replyToken"]
 
-    # 發送給 OpenRouter 的 Prompt 設定
+    # ✅ 加強限制：只允許心靈雞湯，拒答不相關問題
     payload = {
         "model": "google/gemini-flash-1.5",
         "messages": [
             {
                 "role": "system",
                 "content": (
-                    "你是一位溫柔正向、善於安慰人的心靈導師。\n"
-                    "請根據使用者的文字，生成一段約 80～150 字的心靈雞湯內容。\n"
-                    "內容要鼓勵人、充滿希望、正面積極，避免具體知識與指令教學。\n"
-                    "請使用溫暖的語氣，像朋友一樣說話，可以適當加入 Emoji（如 🌸🌈☀️💖）。"
+                    "你是一位溫暖、正向的心靈導師，只回答關於情緒、人生、心靈成長的問題。\n"
+                    "不允許回應任何與寫程式、知識查詢、指令操作、遊戲互動或閒聊等不相關主題。\n"
+                    "若使用者提出與主題無關的問題（如幫我寫程式、查資料、解釋概念等），請禮貌婉拒，並鼓勵對方說出內心感受。\n"
+                    "回應語氣要像一位理解人的朋友，文字要正面勵志、溫柔鼓舞，並盡量在 80～150 字內完成。\n"
+                    "可以使用 Emoji（如 ☀️🌸🌈💖）來傳達溫度。"
                 )
             },
             {
@@ -48,18 +45,15 @@ def webhook():
         ]
     }
 
-    # 向 OpenRouter 發出請求
     res = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers=OPENROUTER_HEADERS,
         json=payload
     )
 
-    # 取得 AI 回應文字
     result = res.json()
     ai_reply = result["choices"][0]["message"]["content"]
 
-    # 傳送給 LINE 使用者
     reply_body = {
         "replyToken": reply_token,
         "messages": [{"type": "text", "text": ai_reply}]

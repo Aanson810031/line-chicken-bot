@@ -4,7 +4,7 @@ import os
 
 app = Flask(__name__)
 
-# 讀取金鑰
+# 讀取環境變數
 LINE_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
@@ -15,7 +15,7 @@ LINE_HEADERS = {
 
 @app.route("/")
 def home():
-    return "✅ LINE BOT with Gemini Flash is running."
+    return "✅ LINE BOT using GPT-4o-mini is running."
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -32,7 +32,7 @@ def webhook():
     user_text = event["message"]["text"]
     reply_token = event["replyToken"]
 
-    # 一律交給 Gemini Flash 回應
+    # 呼叫 OpenRouter GPT-4o-mini API
     try:
         ai_response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -41,20 +41,19 @@ def webhook():
                 "Content-Type": "application/json"
             },
             json={
-                "model": "google/gemini-pro",
+                "model": "openai/gpt-4o-mini",
                 "messages": [
-                    {"role": "system", "content": "你是一個溫暖而積極的 LINE AI 助理"},
+                    {"role": "system", "content": "你是一個溫暖、正向的 LINE 助理，回答要親切而簡潔。"},
                     {"role": "user", "content": user_text}
                 ]
             }
         )
-
         reply = ai_response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        print("❌ Gemini API 錯誤：", e)
+        print("❌ AI 回應錯誤：", e)
         reply = "⚠️ 抱歉，AI 回覆發生錯誤，請稍後再試。"
 
-    # 發送回 LINE 使用者
+    # 回傳訊息到 LINE
     body = {
         "replyToken": reply_token,
         "messages": [{"type": "text", "text": reply}]
@@ -63,6 +62,7 @@ def webhook():
     r = requests.post("https://api.line.me/v2/bot/message/reply",
                       headers=LINE_HEADERS, json=body)
     print("📝 發送結果：", r.status_code, r.text)
+
     return "OK"
 
 if __name__ == "__main__":

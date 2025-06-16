@@ -4,14 +4,17 @@ import os
 
 app = Flask(__name__)
 
+# 從環境變數取得金鑰
 CHANNEL_ACCESS_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
+# LINE 回應所需的 Header
 LINE_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"
 }
 
+# OpenRouter API Header
 OPENROUTER_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {OPENROUTER_API_KEY}"
@@ -24,44 +27,46 @@ def webhook():
     user_text = event["message"]["text"]
     reply_token = event["replyToken"]
 
-    # ✅ 無關主題關鍵字過濾（避免寫程式、技術、閒聊等）
+    # 🚫 不允許的關鍵詞（非心靈雞湯主題）
     banned_keywords = [
-        "寫程式", "教我", "語法", "API", "GPT", "Python", "JavaScript", "怎麼做", 
-        "是什麼", "解釋", "知識", "ChatGPT", "資料庫", "openai", "翻譯", "代碼",
-        "定義", "遊戲", "猜拳", "笑話", "故事", "詩", "數學", "單字", "爬蟲"
+        "寫程式", "python", "api", "教我", "語法", "怎麼做", "chatgpt", "模型", "定義",
+        "翻譯", "openai", "爬蟲", "資料庫", "數學", "笑話", "故事", "遊戲", "代碼", "語言"
     ]
 
-    if any(keyword.lower() in user_text.lower() for keyword in banned_keywords):
-        ai_reply = "這裡是溫暖的心靈角落 😊 我專門陪你聊聊情緒與人生唷～有什麼煩惱或感受想說說嗎？🌿"
+    # ✅ 若出現禁止關鍵詞，直接給固定回覆
+    if any(word in user_text.lower() for word in banned_keywords):
+        ai_reply = "這裡是溫暖的心靈角落 😊 我只專注陪你聊聊情緒與人生唷～有什麼煩惱或感受想說說嗎？🌿"
     else:
+        # ✅ 呼叫 Gemini Flash 生成心靈雞湯
         payload = {
             "model": "google/gemini-flash-1.5",
             "messages": [
                 {
                     "role": "system",
                     "content": (
-                        "你是一位溫暖正向的心靈導師，只回答與人生、情緒、心理支持有關的問題。\n"
-                        "不允許回答任何與技術、程式、遊戲、閒聊、知識查詢、邏輯推理或科學問題。\n"
-                        "請使用鼓舞人心、同理理解的語氣來回應。\n"
-                        "每次回應請在 80～150 字內，可加入 Emoji（🌈💖🌿💪），像朋友一樣關心對方。"
+                        "你是一位溫柔的心靈導師，只回答與情緒、人生、心靈支持有關的問題。\n"
+                        "嚴禁回答技術、寫程式、遊戲、查資料、搞笑、科普、百科、閒聊類問題。\n"
+                        "請用理解、鼓勵、陪伴的方式來回應，字數介於 80～150 字，並搭配合適 Emoji 🌈💖🌿💪。\n"
+                        "如果對方問題不太相關，也請婉轉引導他回到情緒與生活話題。"
                     )
                 },
                 {"role": "user", "content": user_text}
             ]
         }
 
-        res = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=OPENROUTER_HEADERS,
-            json=payload
-        )
-
         try:
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=OPENROUTER_HEADERS,
+                json=payload
+            )
             result = res.json()
             ai_reply = result["choices"][0]["message"]["content"]
-        except:
+        except Exception as e:
+            print("OpenRouter error:", e)
             ai_reply = "⚠️ 抱歉，AI 回覆時發生問題，請稍後再試～我會一直在這裡等你 🌟"
 
+    # 回傳訊息給 LINE
     reply_body = {
         "replyToken": reply_token,
         "messages": [{"type": "text", "text": ai_reply}]
@@ -75,5 +80,7 @@ def webhook():
 
     return "OK"
 
+# ✅ 正確綁定埠口以支援 Render 部署
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

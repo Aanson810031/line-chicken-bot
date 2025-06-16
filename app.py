@@ -4,7 +4,7 @@ import os
 
 app = Flask(__name__)
 
-# 讀取環境變數
+# 讀取金鑰
 LINE_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
@@ -15,7 +15,7 @@ LINE_HEADERS = {
 
 @app.route("/")
 def home():
-    return "✅ LINE BOT with Gemini is running."
+    return "✅ LINE BOT with Gemini Flash is running."
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -32,38 +32,29 @@ def webhook():
     user_text = event["message"]["text"]
     reply_token = event["replyToken"]
 
-    # 判斷是否使用 AI 回覆（#AI 開頭才觸發）
-    if user_text.startswith("#AI "):
-        prompt = user_text[4:]
-
-        # 呼叫 OpenRouter API - Gemini 2.0 Flash
-        response = requests.post(
+    # 一律交給 Gemini Flash 回應
+    try:
+        ai_response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                 "Content-Type": "application/json"
             },
             json={
-                "model": "google/gemini-pro-vision",  # 可用 "google/gemini-pro" 或其他
+                "model": "google/gemini-pro",
                 "messages": [
-                    {"role": "system", "content": "你是一個正面溫柔的 AI 助理"},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": "你是一個溫暖而積極的 LINE AI 助理"},
+                    {"role": "user", "content": user_text}
                 ]
             }
         )
 
-        try:
-            reply = response.json()["choices"][0]["message"]["content"]
-        except:
-            reply = "⚠️ 抱歉，AI 回覆失敗，請稍後再試。"
-    else:
-        # 預設回應
-        if "難過" in user_text or "疲累" in user_text or "低落" in user_text:
-            reply = "別難過，一切都會過去的。🌈"
-        else:
-            reply = "今天也要記得微笑！🙂"
+        reply = ai_response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print("❌ Gemini API 錯誤：", e)
+        reply = "⚠️ 抱歉，AI 回覆發生錯誤，請稍後再試。"
 
-    # 發送回覆訊息
+    # 發送回 LINE 使用者
     body = {
         "replyToken": reply_token,
         "messages": [{"type": "text", "text": reply}]

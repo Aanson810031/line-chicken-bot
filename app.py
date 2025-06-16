@@ -4,7 +4,9 @@ import os
 
 app = Flask(__name__)
 
-CHANNEL_ACCESS_TOKEN = "你的 Access Token"
+# ✅ 改為從環境變數讀取 Token（Render 已設定）
+CHANNEL_ACCESS_TOKEN = os.environ.get("CHANNEL_ACCESS_TOKEN")
+
 HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"
@@ -17,7 +19,8 @@ def webhook():
     text = event["message"]["text"]
     reply_token = event["replyToken"]
 
-    if "難過" in text:
+    # 心靈雞湯回應
+    if "難過" in text or "疲累" in text or "低落" in text:
         reply = "別難過，一切都會過去的。🌈"
     else:
         reply = "今天也要記得微笑！🙂"
@@ -32,6 +35,5 @@ def webhook():
 
     return "OK"
 
-# ✅ 這段一定要有！
 if __name__ == "__main__":
     app.run()
